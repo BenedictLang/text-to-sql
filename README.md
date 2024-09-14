@@ -1,6 +1,6 @@
-<h1 align="left">Triage Assistent</h1>
+<h1>Triage Assistent</h1>
 
-<p align="left">
+<p>
   A text-to-SQL transformer for log analysis, built with Next.js, Vercel AI SDK, and Azure AI.
 </p>
 

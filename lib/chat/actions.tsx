@@ -9,6 +9,7 @@ import {
   createStreamableValue
 } from 'ai/rsc'
 import { openai } from '@ai-sdk/openai'
+import { createAzure } from '@ai-sdk/azure'
 
 import {
   spinner,
@@ -35,6 +36,12 @@ import { saveChat } from '@/app/actions'
 import { SpinnerMessage, UserMessage } from '@/components/stocks/message'
 import { Chat, Message } from '@/lib/types'
 import { auth } from '@/auth'
+
+const azure = createAzure({
+  //resourceName: process.env.AZURE_RESOURCE_NAME, // Azure Ressource-Name
+  apiKey: process.env.AZURE_API_KEY,            // API-Key
+  baseURL: process.env.AZURE_ENDPOINT,            // Optionale benutzerdefinierte URL
+});
 
 async function confirmPurchase(symbol: string, price: number, amount: number) {
   'use server'
@@ -127,7 +134,7 @@ async function submitUserMessage(content: string) {
   let textNode: undefined | React.ReactNode
 
   const result = await streamUI({
-    model: openai('gpt-3.5-turbo'),
+    model: azure('text-to-sql'),
     initial: <SpinnerMessage />,
     system: `\
     You are a stock trading conversation bot and you can help users buy stocks, step by step.
