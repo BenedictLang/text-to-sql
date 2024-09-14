@@ -198,12 +198,12 @@ function IconUser({ className, ...props }: React.ComponentProps<'svg'>) {
   )
 }
 
-function IconPlus({ className, ...props }: React.ComponentProps<'svg'>) {
+function IconPlus({ className, inverted, ...props }: React.ComponentProps<'svg'> & { inverted?: boolean }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 256 256"
-      fill="currentColor"
+      fill={inverted ? 'black' : 'white'}
       className={cn('size-4', className)}
       {...props}
     >

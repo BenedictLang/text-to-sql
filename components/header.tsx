@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils'
 import { auth } from '@/auth'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
-  IconGitHub,
-  IconNextChat,
-  IconSeparator,
-  IconVercel
+    IconGitHub,
+    IconNextChat, IconPlus,
+    IconSeparator,
+    IconVercel
 } from '@/components/ui/icons'
 import { UserMenu } from '@/components/user-menu'
 import { SidebarMobile } from './sidebar-mobile'
@@ -29,8 +29,8 @@ async function UserOrLogin() {
         </>
       ) : (
         <Link href="/new" rel="nofollow">
-          <IconNextChat className="size-6 mr-2 dark:hidden" inverted />
-          <IconNextChat className="hidden size-6 mr-2 dark:block" />
+          <IconPlus className="size-6 mr-2 dark:hidden" inverted />
+          <IconPlus className="hidden size-6 mr-2 dark:block" />
         </Link>
       )}
       <div className="flex items-center">
