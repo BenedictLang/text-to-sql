@@ -37,9 +37,9 @@ export function ChatPanel({
   const exampleMessages = [
 
     {
-      heading: 'Show me',
-      subheading: 'the system information',
-      message: 'Show me the system information'
+      heading: 'Are there any',
+      subheading: 'unprotected user accounts',
+      message: 'Are there any users on this system, that are not password protected?'
     },
     {
       heading: 'What are the',
