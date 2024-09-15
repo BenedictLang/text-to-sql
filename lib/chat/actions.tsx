@@ -7,6 +7,7 @@ import {
   streamUI,
   createStreamableValue
 } from 'ai/rsc'
+import { generateText } from "ai"
 import { createAzure } from '@ai-sdk/azure'
 
 import {
@@ -46,11 +47,11 @@ async function submitUserMessage(content: string) {
   let textStream: undefined | ReturnType<typeof createStreamableValue<string>>
   let textNode: undefined | React.ReactNode
 
-  const result = await streamUI({
+  const queryResult = await generateText({
     model: azure('text-to-sql'),
-    initial: <SpinnerMessage />,
     system: `\
-    You are a security triage assistant, and your only job is transforming the user's question to executable SQLite queries.
+    You are a security triage assistant, and your only job is transforming the user's question regarding a windows client 
+    to executable SQLite queries.
     You will always answer with 3 possible SQL queries and nothing more using the following database schemes.
     
     \\--System Data
@@ -141,6 +142,23 @@ async function submitUserMessage(content: string) {
         content: message.content,
         name: message.name
       }))
+    ]
+  })
+
+  console.log('Generated Queries:', queryResult.text);
+
+  const result = await streamUI({
+    model: azure('text-to-sql'),
+    initial: <SpinnerMessage />,
+    system: `\
+    You are a query optimization assistant. From the following 3 SQLite queries, choose the best one and return it as your response.
+    \\
+    `,
+    messages: [
+      {
+        role: 'user',
+        content: `${content} \\ ${queryResult.text}`,
+      },
     ],
     text: ({ content, done, delta }) => {
       if (!textStream) {
