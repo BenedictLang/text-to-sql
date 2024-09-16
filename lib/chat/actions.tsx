@@ -1,32 +1,66 @@
 import 'server-only'
+import sqlite3 from 'better-sqlite3';
+import path from 'path';
 
-import {
-  createAI,
-  getMutableAIState,
-  getAIState,
-  streamUI,
-  createStreamableValue
-} from 'ai/rsc'
-import { generateText } from "ai"
-import { createAzure } from '@ai-sdk/azure'
+import {createAI, createStreamableValue, getAIState, getMutableAIState, streamUI} from 'ai/rsc'
+import {generateText} from "ai"
+import {createAzure} from '@ai-sdk/azure'
 
-import {
-  BotMessage,
-} from '@/components/stocks'
+import {BotMessage,} from '@/components/stocks'
 
-import {
-  nanoid
-} from '@/lib/utils'
-import { saveChat } from '@/app/actions'
-import { SpinnerMessage, UserMessage } from '@/components/stocks/message'
-import { Chat, Message } from '@/lib/types'
-import { auth } from '@/auth'
+import {nanoid} from '@/lib/utils'
+import {saveChat} from '@/app/actions'
+import {SpinnerMessage, UserMessage} from '@/components/stocks/message'
+import {Chat, Message} from '@/lib/types'
+import {auth} from '@/auth'
 
 const azure = createAzure({
   apiKey: process.env.AZURE_API_KEY,
   baseURL: process.env.AZURE_ENDPOINT,
 });
 
+
+/**
+ * Helper function to execute SQLite query
+ * @param query The SQLite query to execute.
+ */
+function executeSQLiteQuery(query: string) {
+  const dbPath = path.join(process.cwd(), 'public', 'db', 'triage.db');
+  const db = sqlite3(dbPath);
+
+  try {
+    return db.prepare(query).all();
+  } catch (error) {
+    console.error('Error executing query:', error);
+    return [];
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Helper function to convert tabular data to a Markdown table.
+ * @param data
+ */
+function formatDataAsMarkdownTable(data: any[]): string {
+  if (data.length === 0) return '*No results found.*';
+
+  const headers = Object.keys(data[0]); // Get column names
+  const rows = data.map(row => Object.values(row)); // Get row values
+
+  let markdownTable = `| ${headers.join(' | ')} |\n`; // Header row
+  markdownTable += `| ${headers.map(() => '---').join(' | ')} |\n`; // Divider row
+  rows.forEach(row => {
+    markdownTable += `| ${row.join(' | ')} |\n`;
+  });
+
+  return markdownTable;
+}
+
+/**
+ * Handles a submitted message by the user.
+ * @param content The input of the user.
+ */
 async function submitUserMessage(content: string) {
   'use server'
 
@@ -47,13 +81,21 @@ async function submitUserMessage(content: string) {
   let textStream: undefined | ReturnType<typeof createStreamableValue<string>>
   let textNode: undefined | React.ReactNode
 
+  // Generate SQL queries using the database schemes
   const queryResult = await generateText({
     model: azure('text-to-sql'),
     system: `\
     You are a security triage assistant, and your only job is transforming the user's question regarding a windows client 
     to executable SQLite queries.
     You will always answer with 3 possible SQL queries and nothing more using the following database schemes.
+    Only if you dont find a suitable schema that could contain the data you are allowed to answer "Request was not possible".
     
+    Example:
+    Q: Are there any users on this system, that are not password protected?
+    
+    => SELECT Username, SecurityID, fullname FROM useraccounts WHERE passwordrequired = 0;
+
+    Schemes:
     \\--System Data
     CREATE TABLE "system" (
       "Tag" REAL,
@@ -147,11 +189,13 @@ async function submitUserMessage(content: string) {
 
   console.log('Generated Queries:', queryResult.text);
 
+  // Select the best query out of a string of queries
   const result = await streamUI({
     model: azure('text-to-sql'),
     initial: <SpinnerMessage />,
     system: `\
     You are a query optimization assistant. From the following 3 SQLite queries, choose the best one and return it as your unformatted response.
+    If you do not get any SQL queries return nothing.
     \\
     `,
     messages: [
@@ -163,11 +207,42 @@ async function submitUserMessage(content: string) {
     text: ({ content, done, delta }) => {
       if (!textStream) {
         textStream = createStreamableValue('')
-        textNode = <BotMessage content={textStream.value} />
+        textNode = <SpinnerMessage />
       }
 
       if (done) {
-        textStream.done()
+        // Execute the selected query on the SQLite database
+        const query: string = content.trim()
+        const errorMessage: string = '*Sorry, no query could be generated*'
+
+        let queryResults: any[] = []
+        let formattedResults: string | null = null
+        let markdownTable: string = ''
+
+        if (query.length > 0) {
+          try {
+            queryResults = executeSQLiteQuery(query)
+            if (queryResults.length > 0) {
+              formattedResults = queryResults.length
+                  ? JSON.stringify(queryResults, null, 2)
+                  : 'No results found.'
+              markdownTable = formatDataAsMarkdownTable(queryResults)
+            } else {
+              formattedResults = '*No results found.*'
+            }
+          } catch (error: any) {
+            console.log(`Error executing query: ${error.message}`)
+            formattedResults = null
+          }
+        }
+
+        textNode = (
+            <BotMessage content={formattedResults
+                ? `Executing \`${query}\`\n\n${markdownTable}`
+                : errorMessage} />
+        );
+
+        textStream.done();
         aiState.done({
           ...aiState.get(),
           messages: [
@@ -175,9 +250,11 @@ async function submitUserMessage(content: string) {
             {
               id: nanoid(),
               role: 'assistant',
-              content
-            }
-          ]
+              content: formattedResults
+                  ? `\`${query}\`\n\n${formattedResults}`
+                  : errorMessage,
+            },
+          ],
         })
       } else {
         textStream.update(delta)
