@@ -151,7 +151,7 @@ async function submitUserMessage(content: string) {
     model: azure('text-to-sql'),
     initial: <SpinnerMessage />,
     system: `\
-    You are a query optimization assistant. From the following 3 SQLite queries, choose the best one and return it as your response.
+    You are a query optimization assistant. From the following 3 SQLite queries, choose the best one and return it as your unformatted response.
     \\
     `,
     messages: [
