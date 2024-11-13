@@ -1,6 +1,8 @@
 import { clsx, type ClassValue } from 'clsx'
 import { customAlphabet } from 'nanoid'
 import { twMerge } from 'tailwind-merge'
+import path from "path";
+import sqlite3 from "better-sqlite3";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -61,6 +63,43 @@ export const getStringFromBuffer = (buffer: ArrayBuffer) =>
   Array.from(new Uint8Array(buffer))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
+
+/**
+ * Helper function to execute SQLite query
+ * @param query The SQLite query to execute.
+ */
+export const executeSQLiteQuery = (query: string) => {
+  const dbPath = path.join(process.cwd(), 'public', 'db', 'triage.db');
+  const db = sqlite3(dbPath);
+
+  try {
+    return db.prepare(query).all();
+  } catch (error) {
+    console.error('Error executing query:', error);
+    return [];
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Helper function to convert tabular data to a Markdown table.
+ * @param data
+ */
+export const formatDataAsMarkdownTable = (data: any[]): string => {
+  if (data.length === 0) return '*No results found.*';
+
+  const headers = Object.keys(data[0]); // Get column names
+  const rows = data.map(row => Object.values(row)); // Get row values
+
+  let markdownTable = `| ${headers.join(' | ')} |\n`; // Header row
+  markdownTable += `| ${headers.map(() => '---').join(' | ')} |\n`; // Divider row
+  rows.forEach(row => {
+    markdownTable += `| ${row.join(' | ')} |\n`;
+  });
+
+  return markdownTable;
+}
 
 export enum ResultCode {
   InvalidCredentials = 'INVALID_CREDENTIALS',

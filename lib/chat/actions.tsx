@@ -1,6 +1,4 @@
 import 'server-only'
-import sqlite3 from 'better-sqlite3';
-import path from 'path';
 
 import {createAI, createStreamableValue, getAIState, getMutableAIState, streamUI} from 'ai/rsc'
 import {generateText} from "ai"
@@ -8,7 +6,7 @@ import {createAzure} from '@ai-sdk/azure'
 
 import {BotMessage,} from '@/components/stocks'
 
-import {nanoid} from '@/lib/utils'
+import {nanoid, executeSQLiteQuery, formatDataAsMarkdownTable} from '@/lib/utils'
 import {saveChat} from '@/app/actions'
 import {SpinnerMessage, UserMessage} from '@/components/stocks/message'
 import {Chat, Message} from '@/lib/types'
@@ -19,44 +17,6 @@ const azure = createAzure({
   apiKey: process.env.AZURE_API_KEY,
   baseURL: process.env.AZURE_ENDPOINT,
 });
-
-
-/**
- * Helper function to execute SQLite query
- * @param query The SQLite query to execute.
- */
-function executeSQLiteQuery(query: string) {
-  const dbPath = path.join(process.cwd(), 'public', 'db', 'triage.db');
-  const db = sqlite3(dbPath);
-
-  try {
-    return db.prepare(query).all();
-  } catch (error) {
-    console.error('Error executing query:', error);
-    return [];
-  } finally {
-    db.close();
-  }
-}
-
-/**
- * Helper function to convert tabular data to a Markdown table.
- * @param data
- */
-function formatDataAsMarkdownTable(data: any[]): string {
-  if (data.length === 0) return '*No results found.*';
-
-  const headers = Object.keys(data[0]); // Get column names
-  const rows = data.map(row => Object.values(row)); // Get row values
-
-  let markdownTable = `| ${headers.join(' | ')} |\n`; // Header row
-  markdownTable += `| ${headers.map(() => '---').join(' | ')} |\n`; // Divider row
-  rows.forEach(row => {
-    markdownTable += `| ${row.join(' | ')} |\n`;
-  });
-
-  return markdownTable;
-}
 
 /**
  * Handles a submitted message by the user.
