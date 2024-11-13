@@ -13,6 +13,7 @@ import {saveChat} from '@/app/actions'
 import {SpinnerMessage, UserMessage} from '@/components/stocks/message'
 import {Chat, Message} from '@/lib/types'
 import {auth} from '@/auth'
+import React from "react";
 
 const azure = createAzure({
   apiKey: process.env.AZURE_API_KEY,
@@ -85,15 +86,21 @@ async function submitUserMessage(content: string) {
   const queryResult = await generateText({
     model: azure('text-to-sql'),
     system: `\
-    You are a security triage assistant, and your only job is transforming the user's question regarding a windows client 
-    to executable SQLite queries.
-    You will always answer with 3 possible SQL queries and nothing more using the following database schemes.
-    Only if you dont find a suitable schema that could contain the data you are allowed to answer "Request was not possible".
+    You are a digital forensic assistant, and your only job is transforming the user's question regarding a windows client 
+    to executable SQLite queries to query system logs.
+    You will always answer with: 
+    - repeating the user Question,
+    - 3 possible SQL queries to get the necessary information, and
+    - the corresponding table schema used. 
+    Base your queries on the database schemes below.
+    Only if you can't find a suitable schema that could contain the data you are allowed to answer "Request was not possible".
     
-    Example:
+    Example Queries:
     Q: Are there any users on this system, that are not password protected?
+    A: SELECT Username, SecurityID, fullname FROM useraccounts WHERE passwordrequired = 0;
     
-    => SELECT Username, SecurityID, fullname FROM useraccounts WHERE passwordrequired = 0;
+    Q: Show all registry changes in the last 24 hours since the containment of the data.
+    A: SELECT Path, Text, Modified Username FROM registryapi WHERE Modified >= datetime(’FireEyeGeneratedTime’, ’-1 day’);
 
     Schemes:
     \\--System Data
@@ -253,7 +260,7 @@ async function submitUserMessage(content: string) {
       "pathCertificateChain" TEXT
     );
     
-    Browser Data
+    --Browser Data
     CREATE TABLE "cookiehistory" (
       "Tag" REAL,
       "Notes" REAL,
@@ -763,10 +770,11 @@ async function submitUserMessage(content: string) {
 
   // Select the best query out of a string of queries
   const result = await streamUI({
-    model: azure('text-to-sql'),
+    model: azure('selector'),
     initial: <SpinnerMessage />,
     system: `\
-    You are a query optimization assistant. From the following 3 SQLite queries, choose the best one and return it as your unformatted response.
+    You are a query optimization assistant. From the following 3 SQLite queries, choose the best one in regards to the users question and the SQL schema.
+    Return it as unformatted response without markdown!
     If you do not get any SQL queries return nothing.
     \\
     `,
@@ -785,6 +793,7 @@ async function submitUserMessage(content: string) {
       if (done) {
         // Execute the selected query on the SQLite database
         const query: string = content.trim()
+        console.log("Selected Query:" + query)
         const errorMessage: string = '*Sorry, no query could be generated*'
 
         let queryResults: any[] = []
